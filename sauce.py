@@ -68,8 +68,13 @@ class PowerShell:
     def RunCommand(self, Command):
         process = subprocess.Popen(["powershell", Command], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         output = process.stdout.readlines()
-        return output     
-    
+        return output
+             
+    def get_computerName(self):
+        computerName = self.RunCommand("$env:computername")
+        computerName = computerName[0].strip('\n')
+        return computerName
+
     def get_Serial(self):
         return "wmic bios get serialnumber"
     
@@ -88,16 +93,33 @@ class PowerShell:
             return "Offline"
 
     def get_MAC(self):
-        return ""
+        MAC = ""
+        ethernet = 'Get-NetAdapter -Name "Ethernet" | Select-Object '
+        wi_fi = 'Get-NetAdapter -Name "Wi-Fi" | Select-Object '
+        e_status = ""
+        w_status = ""
+
+        try:
+            w_status = self.RunCommand(str(wi_fi) + "Status")
+            if(w_status.lower() == "online"):
+                w_status = True
+            else:
+                w_status = False
+        except:
+            print("No MSFT_NetAdapter objects found with property 'Name' equal to 'Wi-Fi'")
+
+        if (w_status == True):
+            MAC = (wi_fi + "MacAddress")
+        else:
+            MAC = (ethernet + "MacAddress")     
+        return MAC
 
     def get_computerInfo(self, computerName):
         result=[]
-        commands = [self.get_Serial(), self.get_Model(), self.get_Brand(), self.get_Status(computerName), self.get_MAC()]
+        commands = [self.get_Serial(), self.get_Model(), self.get_Brand(), self.get_MAC()]
         if computerName == "this":
-            computerName = self.RunCommand("$env:computername")
-            computerName = computerName[0].strip('\n')
             for command in commands:
-                result.append(self.RunCommand(command)) 
+                result.append(self.RunCommand(command))
         else:
             for command in commands:
                 result.append(self.RunCommand("Invoke-command -ComputerName '" + str(computerName) + "' -ScriptBlock {" + command + "}")) 
@@ -111,8 +133,8 @@ rows = []
 # Data Grid functions here
 
 # Create one row and add in to the rows list
-def add_row(serial, model, brand, status, mac):
-    computer = [serial,model,brand,status,mac]
+def add_row(name,serial, model, brand, status, mac):
+    computer = [name,serial,model,brand,status,mac]
     global i 
     i=i+1
     items = []
@@ -172,14 +194,13 @@ def show_ComputerInfo():
     name = cnEntry.get().lower()
     if name == "this":
         results = shell.get_computerInfo(name)
-        add_row(str(results[0][2]), str(results[1][2]), str(results[2][2]), "Online", "GHT:456")
+        add_row(shell.get_computerName(), str(results[0][2]), str(results[1][2]), str(results[2][2]), "Online", str(results[3][3]))
        
     elif shell.get_Status(name) == "Online":
         results = shell.get_computerInfo(name)
-        add_row(str(results[0][2]), str(results[1][2]), str(results[2][2]), "Online", "GHT:456")
+        add_row(name.upper(), str(results[0][2]), str(results[1][2]), str(results[2][2]), "Online", "GHT:456")
     else:
         popupmsg("This device may be offline.")
-        add_row("N\A", "N\A", "N\A", "Offline", "N\A")
         
     stopProgress()
 
