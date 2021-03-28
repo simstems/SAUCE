@@ -75,7 +75,7 @@ class Window(Frame):
 
         # adds a command to the menu option, calling it exit, and the
         # command it runs on event is client_exit
-        ayuda.add_command(label="About", command=popupmsg("Version: 3.21"))
+        ayuda.add_command(label="About", command=self.about_popup)
 
         #added "About" to our menu
         menu.add_cascade(label="Help", menu=ayuda)
@@ -83,6 +83,9 @@ class Window(Frame):
     
     def client_exit(self):
         exit()
+    def about_popup(self):
+        popupmsg("Version: 3.21")
+
 
 class PowerShell:
 
