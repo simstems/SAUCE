@@ -35,25 +35,50 @@ class Window(Frame):
         menu = Menu(self.master)
         self.master.config(menu=menu)
 
-        # create the file object)
+        #-------- create the file object
         file = Menu(menu)
 
         # adds a command to the menu option, calling it exit, and the
         # command it runs on event is client_exit
+        file.add_command(label="Import")
+        file.add_command(label="Save")
+        file.add_command(label="Save As")
         file.add_command(label="Exit", command=self.client_exit)
 
-        #added "file" to our menu
+        #added "File" to our menu
         menu.add_cascade(label="File", menu=file)
 
-        # create the file object)
+        #------- create the edit object
         edit = Menu(menu)
 
         # adds a command to the menu option, calling it exit, and the
         # command it runs on event is client_exit
-        edit.add_command(label="Undo")
+        edit.add_command(label="Clear All")
+        edit.add_command(label="Delete Row", command=delete_row)
 
-        #added "file" to our menu
+        #added "Edit" to our menu
         menu.add_cascade(label="Edit", menu=edit)
+
+        #-------- create the tools object
+        tools = Menu(menu)
+
+        # adds a command to the menu option, calling it exit, and the
+        # command it runs on event is client_exit
+        tools.add_command(label="Add Toolbox")
+
+        #added "Tools" to our menu
+        menu.add_cascade(label="Tools", menu=tools)
+
+
+        #-------- create the help(ayuda) object
+        ayuda = Menu(menu)
+
+        # adds a command to the menu option, calling it exit, and the
+        # command it runs on event is client_exit
+        ayuda.add_command(label="About", command=popupmsg("Version: 3.21"))
+
+        #added "About" to our menu
+        menu.add_cascade(label="Help", menu=ayuda)
 
     
     def client_exit(self):
@@ -68,7 +93,11 @@ class PowerShell:
     def RunCommand(self, Command):
         process = subprocess.Popen(["powershell", Command], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         output = process.stdout.readlines()
-        return output
+        errout = process.stderr.readlines()
+        if errout:
+            return errout
+        else:
+            return output
              
     def get_computerName(self):
         computerName = self.RunCommand("$env:computername")
@@ -92,31 +121,66 @@ class PowerShell:
         else:
             return "Offline"
 
-    def get_MAC(self):
-        MAC = ""
+    def get_NETA(self):
+        d_status = "" # Device Status
+        macAddr = "" # MAC Address
         ethernet = 'Get-NetAdapter -Name "Ethernet" | Select-Object '
+        e_line = ""
+        e_status = "I did not receive a new value"
         wi_fi = 'Get-NetAdapter -Name "Wi-Fi" | Select-Object '
-        e_status = ""
-        w_status = ""
-
-        try:
-            w_status = self.RunCommand(str(wi_fi) + "Status")
-            if(w_status.lower() == "online"):
-                w_status = True
+        w_line = ""
+        w_status = "I did not receive a new value"
+    
+        w_line = self.RunCommand(str(wi_fi) + "Status")
+        for line in w_line:
+            if "Up" in line:
+                w_status = "Online"
+                break
+            elif "Disconnected" in line:
+                w_status = "Offline"
+                break
             else:
-                w_status = False
-        except:
-            print("No MSFT_NetAdapter objects found with property 'Name' equal to 'Wi-Fi'")
-
-        if (w_status == True):
-            MAC = (wi_fi + "MacAddress")
+                continue
+        
+        e_line = self.RunCommand(str(ethernet) + "Status")
+        for line in e_line:
+            if "Up" in line:
+                e_status = "Online"
+                break
+            elif "Disconnected" in line:
+                e_status = "Offline"
+                break
+            else:
+                e_status = "Not Present"
+                continue
+    
+        if ((e_status == "Offline") and (w_status == "Offline")):
+            d_status = "Offline"
+            macAddr = (ethernet + "MacAddress")
+        elif ((e_status == "Online") and (w_status == "Online")):
+            d_status = "'Online'"
+            macAddr = (ethernet + "MacAddress")
+        elif (e_status == "Online"):
+            d_status = "'Online'"
+            macAddr = (ethernet + "MacAddress")
+        elif (w_status == "Online"):
+            d_status = "'Online'"
+            macAddr = (wi_fi + "MacAddress")
+        elif (e_status == "Offline"):
+            d_status = "'Offline'"
+            macAddr = (ethernet + "MacAddress")
+        elif (w_status == "Offline"):
+            d_status = "'Offline'"
+            macAddr = (wi_fi + "MacAddress")
         else:
-            MAC = (ethernet + "MacAddress")     
-        return MAC
+            d_status = "'Offline'"
+            macAddr = "'No Adapter'"
+       
+        return [d_status, macAddr]
 
     def get_computerInfo(self, computerName):
         result=[]
-        commands = [self.get_Serial(), self.get_Model(), self.get_Brand(), self.get_MAC()]
+        commands = [self.get_Serial(), self.get_Model(), self.get_Brand(), self.get_NETA()[0], self.get_NETA()[1]]
         if computerName == "this":
             for command in commands:
                 result.append(self.RunCommand(command))
@@ -194,7 +258,8 @@ def show_ComputerInfo():
     name = cnEntry.get().lower()
     if name == "this":
         results = shell.get_computerInfo(name)
-        add_row(shell.get_computerName(), str(results[0][2]), str(results[1][2]), str(results[2][2]), "Online", str(results[3][3]))
+        print(results)
+        add_row(shell.get_computerName(), str(results[0][2]), str(results[1][2]), str(results[2][2]), str(results[3][0]), str(results[4][3]))
        
     elif shell.get_Status(name) == "Online":
         results = shell.get_computerInfo(name)
@@ -278,11 +343,9 @@ e6.grid(row = 1, column = 6 )
 #scrolly.pack(side=LEFT, fill=Y, pady=65)
 
 # create the widgets for the bottom frames
-dlButton = Button(btm_frame, text='Delete Row', bg='#4EC5F1', font=('arial', 8, 'normal'), command=delete_row)
 progessBarOne=tinky.Progressbar(btm_frame2, style='progessBarOne.Horizontal.TProgressbar', orient='horizontal', length=873, mode='indeterminate', maximum=100, value=0)
 
 # layout the widgets in the bottom frames
-dlButton.grid(row =0, column=0)
 progessBarOne.grid(row=1, column=0)
 
 #creation of an instance for window menu
